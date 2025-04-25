@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Gestion des Managers</h2>
+    
+    {% if current_user.role == 'admin' %}
+        <div class="mb-4">
+            <a href="{{ url_for('main.ajouter_manager') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Ajouter un Manager
+            </a>
+        </div>
+    {% endif %}
+
+    {% if managers %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Email</th>
+                        <th>Date de création</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for manager in managers %}
+                    <tr>
+                        <td>{{ manager.username }}</td>
+                        <td>{{ manager.email }}</td>
+                        <td>{{ manager.created_at.strftime('%d/%m/%Y %H:%M') if manager.created_at else 'N/A' }}</td>
+                        <td>
+                            {% if current_user.role == 'admin' %}
+                                <a href="{{ url_for('main.modifier_manager', manager_id=manager._id) }}" 
+                                   class="btn btn-sm btn-warning">
+                                    <i class="bi bi-pencil"></i> Modifier
+                                </a>
+                                <a href="{{ url_for('main.supprimer_manager', manager_id=manager._id) }}" 
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce manager?')">
+                                    <i class="bi bi-trash"></i> Supprimer
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            Aucun manager enregistré pour le moment.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

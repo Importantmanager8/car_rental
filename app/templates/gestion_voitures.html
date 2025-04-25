@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Gestion des Voitures</h2>
+    
+    <div class="mb-4">
+        <a href="{{ url_for('main.ajouter_voiture') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Ajouter une voiture
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Marque</th>
+                    <th>Modèle</th>
+                    <th>Année</th>
+                    <th>Prix/jour</th>
+                    <th>Disponibilité</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for voiture in voitures %}
+                <tr>
+                    <td>{{ voiture.marque }}</td>
+                    <td>{{ voiture.modele }}</td>
+                    <td>{{ voiture.annee }}</td>
+                    <td>{{ voiture.prix }} €</td>
+                    <td>
+                        {% if voiture.disponible %}
+                            <span class="badge bg-success">Disponible</span>
+                        {% else %}
+                            <span class="badge bg-danger">Indisponible</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('main.modifier_voiture', voiture_id=voiture._id) }}" 
+                           class="btn btn-sm btn-warning me-1">
+                            Modifier
+                        </a>
+                        <a href="{{ url_for('main.supprimer_voiture', voiture_id=voiture._id) }}" 
+                           class="btn btn-sm btn-danger"
+                           onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette voiture?')">
+                            Supprimer
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

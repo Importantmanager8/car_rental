@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Gestion des Réservations</h2>
+    
+    <div class="mb-4">
+        <a href="{{ url_for('main.nouvelle_reservation') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nouvelle Réservation
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Client</th>
+                    <th>Voiture</th>
+                    <th>Date Début</th>
+                    <th>Date Fin</th>
+                    <th>Prix Total</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reservation in reservations %}
+                {% set client_id = reservation.client_id|string %}
+                {% set voiture_id = reservation.voiture_id|string %}
+                
+                {% set client = clients.get(client_id) %}
+                {% set voiture = voitures.get(voiture_id) %}
+                
+                <tr>
+                    <td>
+                        {% if client %}
+                            {{ client.username }} ({{ client.email }})
+                        {% else %}
+                            Client inconnu
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if voiture %}
+                            {{ voiture.marque }} {{ voiture.modele }}
+                        {% else %}
+                            Voiture supprimée
+                        {% endif %}
+                    </td>
+                    <td>{{ reservation.date_debut.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ reservation.date_fin.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ reservation.prix_total }} €</td>
+                    <td>
+                        <span class="badge 
+                            {% if reservation.status == 'acceptee' %}bg-success
+                            {% elif reservation.status == 'refusee' %}bg-danger
+                            {% else %}bg-warning text-dark{% endif %}">
+                            {{ reservation.status|replace('_', ' ')|title }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if reservation.status == 'en_attente' %}
+                            <a href="{{ url_for('main.changer_statut_reservation', reservation_id=reservation._id, status='acceptee') }}" 
+                               class="btn btn-sm btn-success me-1">
+                                Accepter
+                            </a>
+                            <a href="{{ url_for('main.changer_statut_reservation', reservation_id=reservation._id, status='refusee') }}" 
+                               class="btn btn-sm btn-danger"
+                               onclick="return confirm('Êtes-vous sûr de vouloir refuser cette réservation?')">
+                                Refuser
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

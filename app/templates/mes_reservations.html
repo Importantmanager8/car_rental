@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Mes Réservations</h2>
+    
+    {% if reservations %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Voiture</th>
+                        <th>Date Début</th>
+                        <th>Date Fin</th>
+                        <th>Prix Total</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reservation in reservations %}
+                    {% set voiture = mongo.db.voitures.find_one({'_id': reservation.voiture_id}) %}
+                    <tr>
+                        <td>
+                            {% if voiture %}
+                                {{ voiture.marque }} {{ voiture.modele }}
+                            {% else %}
+                                Voiture supprimée
+                            {% endif %}
+                        </td>
+                        <td>{{ reservation.date_debut.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ reservation.date_fin.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ reservation.prix_total }} €</td>
+                        <td>
+                            <span class="badge 
+                                {% if reservation.status == 'acceptee' %}bg-success
+                                {% elif reservation.status == 'refusee' %}bg-danger
+                                {% else %}bg-warning text-dark{% endif %}">
+                                {{ reservation.status|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if reservation.status == 'en_attente' %}
+                                <a href="{{ url_for('main.annuler_reservation', reservation_id=reservation._id) }}" 
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Êtes-vous sûr de vouloir annuler cette réservation?')">
+                                    Annuler
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            Vous n'avez aucune réservation pour le moment.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
