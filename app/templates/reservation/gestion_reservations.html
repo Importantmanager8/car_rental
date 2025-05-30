@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Gestion des Réservations</h2>
+    
+    <!-- New Reservation Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Créer une nouvelle réservation</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.client_nom.label }}
+                            {{ form.client_nom(class="form-control", required=true) }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.voiture_id.label }}
+                            {{ form.voiture_id(class="form-control", required=true) }}
+                            {% if form.voiture_id.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.voiture_id.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.date_debut.label }}
+                            {{ form.date_debut(class="form-control") }}
+                            {% if form.date_debut.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.date_debut.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            {{ form.date_fin.label }}
+                            {{ form.date_fin(class="form-control") }}
+                            {% if form.date_fin.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.date_fin.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Créer Réservation</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reservations List -->
+    <div class="card">
+        <div class="card-header">
+            <h5>Liste des Réservations</h5>
+        </div>
+        <div class="card-body">
+            {% if reservations %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Voiture</th>
+                                <th>Dates</th>
+                                <th>Prix</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res in reservations %}
+                            <tr>
+                                <td>
+                                    {% if res.client_nom %}
+                                        {{ res.client_nom }}
+                                    {% else %}
+                                        Client anonyme
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if res.voiture %}
+                                        {{ res.voiture.marque }} {{ res.voiture.modele }}
+                                    {% else %}
+                                        Voiture supprimée
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ res.date_debut.strftime('%d/%m/%Y') }} - 
+                                    {{ res.date_fin.strftime('%d/%m/%Y') }}
+                                </td>
+                                <td>{{ res.prix_total }} MAD</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if res.status == 'acceptee' %}bg-success
+                                        {% elif res.status == 'refusee' %}bg-danger
+                                        {% elif res.status == 'annulee' %}bg-secondary
+                                        {% else %}bg-warning text-dark{% endif %}">
+                                        {{ res.status|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if res.status == 'en_attente' %}
+                                        <a href="{{ url_for('main.changer_statut_reservation', reservation_id=res._id, status='acceptee') }}" 
+                                           class="btn btn-sm btn-success"
+                                           onclick="return confirm('Confirmer cette réservation?')">
+                                            Accepter
+                                        </a>
+                                        <a href="{{ url_for('main.changer_statut_reservation', reservation_id=res._id, status='refusee') }}" 
+                                           class="btn btn-sm btn-danger"
+                                           onclick="return confirm('Refuser cette réservation?')">
+                                            Refuser
+                                        </a>
+                                    {% elif res.status == 'acceptee' %}
+                                        <a href="{{ url_for('main.changer_statut_reservation', reservation_id=res._id, status='annulee') }}" 
+                                           class="btn btn-sm btn-danger"
+                                           onclick="return confirm('Annuler cette réservation?')">
+                                            Annuler
+                                        </a>
+                                    {% endif %}
+                                    <a href="{{ url_for('main.supprimer_reservation', reservation_id=res._id) }}" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('Êtes-vous sûr de vouloir supprimer définitivement cette réservation ?')">
+                                        <i class="fas fa-trash"></i>
+                                        Supprimer
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    Aucune réservation trouvée.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

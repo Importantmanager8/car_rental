@@ -1,5 +1,5 @@
-import datetime
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from datetime import datetime
+from flask import Blueprint, current_app, render_template, redirect, url_for, flash, request, send_file, abort, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson.objectid import ObjectId
@@ -9,6 +9,10 @@ from app.models import User
 from datetime import datetime
 from bson.objectid import ObjectId
 from datetime import datetime  # Ajoutez cet import en haut du fichier
+from werkzeug.utils import secure_filename  # For secure filename handling
+import os  # For path operations
+from .models import Voiture
+from .forms import VoitureForm
 # Création du Blueprint
 main_bp = Blueprint('main', __name__)
 
@@ -20,10 +24,21 @@ def load_user(user_id):
         return None
     return User(user_data)
 
+
 @main_bp.route('/')
+@login_required  # Bloque l'accès aux non-connectés
 def index():
-    voitures = list(mongo.db.voitures.find({'disponible': True}))
-    return render_template('index.html', voitures=voitures)
+    # Rediriger en fonction du rôle
+    if current_user.role == 'admin':
+        managers = list(mongo.db.users.find({'role': 'manager'}))
+        return render_template('index.html', managers=managers)
+    elif current_user.role == 'manager':
+        voitures = list(mongo.db.voitures.find({'disponible': True}))
+        return render_template('index.html', voitures=voitures)
+    else:
+        # Cas par défaut (si d'autres rôles existent)
+        flash("Vous n'avez pas les permissions nécessaires", 'danger')
+        return redirect(url_for('main.logout'))  # Déconnecte les utilisateurs non autorisés
 
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -74,11 +89,13 @@ def logout():
 
 @main_bp.route('/register', methods=['GET', 'POST'])
 def register():
+    print("Inscription d'un nouvel utilisateur")
     """Inscription de nouveaux utilisateurs"""
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
     
     form = RegistrationForm()
+    print(form)
     if form.validate_on_submit():
         hashed_password = generate_password_hash(form.password.data)
         user_data = {
@@ -93,115 +110,290 @@ def register():
     
     return render_template('register.html', form=form)
 
-@main_bp.route('/voitures')
+@main_bp.route('/voiture')
 def voitures():
     """Liste des voitures disponibles"""
-    voitures = list(mongo.db.voitures.find({'disponible': True}))
-    return render_template('voitures.html', voitures=voitures)
+    voitures = list(mongo.db.voitures.find())
+    
+    # Récupérer les valeurs uniques pour les filtres
+    marques_uniques = sorted(list(set(v['marque'] for v in voitures)))
+    types_uniques = sorted(list(set(v.get('type', '') for v in voitures if v.get('type'))))
+    prix_max = max(v['prix'] for v in voitures) if voitures else 0
+    
+    return render_template('voiture/voitures.html', 
+                         voitures=voitures,
+                         marques_uniques=marques_uniques,
+                         types_uniques=types_uniques,
+                         prix_max=prix_max)
 
+# Supprimez les doublons de la route /reserver
 @main_bp.route('/reserver/<voiture_id>', methods=['GET', 'POST'])
 @login_required
 def reserver(voiture_id):
+    # Vérifier que la voiture existe et est disponible
+    voiture = mongo.db.voitures.find_one({
+        '_id': ObjectId(voiture_id),
+        'disponible': True
+    })
+    
+    if not voiture:
+        flash('Voiture non trouvée ou non disponible', 'danger')
+        return redirect(url_for('main.voitures'))
+
+    form = ReservationForm()
+    form.voiture_id.choices = [(str(voiture['_id']), f"{voiture['marque']} {voiture['modele']}")]
+
+    if form.validate_on_submit():
+        try:
+            # Validation et conversion des dates
+            date_debut = datetime.combine(form.date_debut.data, datetime.min.time())
+            date_fin = datetime.combine(form.date_fin.data, datetime.min.time())
+            
+            # Vérification que la date de début est future
+            if date_debut < datetime.now():
+                flash('La date de début doit être future', 'danger')
+                return redirect(url_for('main.reserver', voiture_id=voiture_id))
+            
+            # Vérification que la date de fin est après la date de début
+            if date_fin <= date_debut:
+                flash('La date de fin doit être après la date de début', 'danger')
+                return redirect(url_for('main.reserver', voiture_id=voiture_id))
+
+            # Calcul de la durée et du prix
+            delta = date_fin - date_debut
+            jours = delta.days
+            if jours < 1:
+                flash('La durée doit être d\'au moins 1 jour', 'danger')
+                return redirect(url_for('main.reserver', voiture_id=voiture_id))
+            
+            total = jours * voiture['prix']
+            
+            # Vérifier une dernière fois que la voiture est toujours disponible
+            voiture_dispo = mongo.db.voitures.find_one({
+                '_id': ObjectId(voiture_id),
+                'disponible': True
+            })
+            
+            if not voiture_dispo:
+                flash('Désolé, cette voiture vient d\'être réservée', 'warning')
+                return redirect(url_for('main.voitures'))
+            
+            # Création réservation
+            reservation_data = {
+                'client_nom': form.client_nom.data,
+                'voiture_id': ObjectId(voiture_id),
+                'date_debut': date_debut,
+                'date_fin': date_fin,
+                'prix_total': total,
+                'status': 'en_attente',
+                'created_at': datetime.utcnow()
+            }
+            
+            # Insérer la réservation
+            result = mongo.db.reservations.insert_one(reservation_data)
+            
+            if result.inserted_id:
+                # Mise à jour disponibilité voiture
+                update_result = mongo.db.voitures.update_one(
+                    {'_id': ObjectId(voiture_id)},
+                    {'$set': {'disponible': False}}
+                )
+                
+                if update_result.modified_count > 0:
+                    flash('Réservation effectuée avec succès!', 'success')
+                else:
+                    # Si la mise à jour de la voiture échoue, supprimer la réservation
+                    mongo.db.reservations.delete_one({'_id': result.inserted_id})
+                    flash('Erreur lors de la réservation, veuillez réessayer', 'danger')
+                    return redirect(url_for('main.voitures'))
+            else:
+                flash('Erreur lors de la création de la réservation', 'danger')
+                return redirect(url_for('main.voitures'))
+            
+            return redirect(url_for('main.gestion_reservations'))
+            
+        except Exception as e:
+            flash(f"Erreur lors de la réservation: {str(e)}", 'danger')
+            return redirect(url_for('main.voitures'))
+
+    # Pré-remplir le nom si utilisateur connecté
+    if current_user.is_authenticated:
+        form.client_nom.data = current_user.username
+    
+    return render_template('reservation/gestion_reservations.html', form=form, voiture=voiture)
+
+
+
+@main_bp.route('/voiture/ajouter', methods=['GET', 'POST'])
+@login_required
+def ajouter_voiture():
+    if current_user.role not in ['admin', 'manager']:
+        flash('Accès non autorisé', 'danger')
+        return redirect(url_for('main.index'))
+
+    form = VoitureForm()
+    if form.validate_on_submit():
+        try:
+            # Traitement des images
+            image_urls = []
+            image_principale = None
+            
+            if form.images.data:
+                for image in form.images.data:
+                    if image:
+                        # Sécuriser le nom du fichier
+                        filename = secure_filename(image.filename)
+                        # Ajouter un timestamp pour éviter les doublons
+                        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                        filename = f"{timestamp}_{filename}"
+                        
+                        # Sauvegarder l'image
+                        image_path = os.path.join('app', 'static', 'images', filename)
+                        image.save(image_path)
+                        
+                        # Ajouter l'URL à la liste
+                        image_url = f'images/{filename}'
+                        image_urls.append(image_url)
+                        
+                        # Si c'est la première image, la définir comme principale
+                        if not image_principale:
+                            image_principale = image_url
+
+            # Traitement des options
+            options = [opt.strip() for opt in form.options.data.split('\n') if opt.strip()] if form.options.data else []
+
+            # Création de la voiture avec conversion du prix en float
+            voiture_id = Voiture.create(
+                marque=form.marque.data,
+                modele=form.modele.data,
+                annee=form.annee.data,
+                prix=float(form.prix.data),  # Conversion de Decimal en float
+                description=form.description.data,
+                options=options,
+                disponible=form.disponible.data,
+                image_url=image_principale
+            )
+
+            # Ajouter les images supplémentaires
+            for image_url in image_urls[1:]:  # Skip the first one as it's already set as principal
+                Voiture.add_image(voiture_id, image_url)
+
+            flash('Voiture ajoutée avec succès!', 'success')
+            return redirect(url_for('main.gestion_voitures'))
+
+        except Exception as e:
+            flash(f'Erreur lors de l\'ajout de la voiture: {str(e)}', 'danger')
+
+    return render_template('voiture/ajouter_voiture.html', form=form)
+
+
+@main_bp.route('/image/<path:filename>')
+def image_from_path(filename):
+    full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    if not os.path.exists(full_path):
+        return abort(404)
+    return send_file(full_path)
+
+@main_bp.route('/voiture/modifier_voiture/<voiture_id>', methods=['GET', 'POST'])
+@login_required
+def modifier_voiture(voiture_id):
+    if current_user.role not in ['admin', 'manager']:
+        flash('Accès non autorisé', 'danger')
+        return redirect(url_for('main.index'))
+
     voiture = mongo.db.voitures.find_one({'_id': ObjectId(voiture_id)})
     if not voiture:
         flash('Voiture non trouvée', 'danger')
-        return redirect(url_for('main.voitures'))
-    
-    form = ReservationForm()
-    
-    if form.validate_on_submit():
-        # Calcul du nombre de jours
-        delta = form.date_fin.data - form.date_debut.data
-        jours = delta.days
-        total = jours * voiture['prix']
-        
-        reservation_data = {
-            'client_id': current_user.id,
-            'voiture_id': ObjectId(voiture_id),
-            'date_debut': form.date_debut.data,
-            'date_fin': form.date_fin.data,
-            'prix_total': total,
-            'status': 'en_attente',
-            'created_at': datetime.utcnow()
-        }
-        
-        mongo.db.reservations.insert_one(reservation_data)
-        flash('Réservation effectuée avec succès!', 'success')
-        return redirect(url_for('main.mes_reservations'))
-    
-    return render_template('reserver.html', form=form, voiture=voiture)
-    """Réservation d'une voiture"""
-    form = ReservationForm()
-    voiture = mongo.db.voitures.find_one({'_id': ObjectId(voiture_id)})
-    
-    if form.validate_on_submit():
-        reservation_data = {
-            'client_id': current_user.id,
-            'voiture_id': ObjectId(voiture_id),
-            'date_debut': form.date_debut.data,
-            'date_fin': form.date_fin.data,
-            'status': 'en_attente'
-        }
-        mongo.db.reservations.insert_one(reservation_data)
-        flash('Votre réservation a été soumise avec succès!', 'success')
-        return redirect(url_for('main.mes_reservations'))
-    
-    return render_template('reserver.html', form=form, voiture=voiture)
-
-
-@main_bp.route('/ajouter_voiture', methods=['GET', 'POST'])
-@login_required
-def ajouter_voiture():
-    if current_user.role not in ['manager', 'admin']:
-        flash('Accès non autorisé', 'danger')
-        return redirect(url_for('main.index'))
-
-    form = VoitureForm()
-    if form.validate_on_submit():
-        voiture_data = {
-            'marque': form.marque.data,
-            'modele': form.modele.data,
-            'annee': form.annee.data,
-            'prix': form.prix.data,
-            'disponible': True,
-            'created_at': datetime.utcnow()
-        }
-        mongo.db.voitures.insert_one(voiture_data)
-        flash('Voiture ajoutée avec succès!', 'success')
         return redirect(url_for('main.gestion_voitures'))
-    
-    return render_template('ajouter_voiture.html', form=form)
 
-@main_bp.route('/modifier_voiture/<voiture_id>', methods=['GET', 'POST'])
-@login_required
-def modifier_voiture(voiture_id):
-    if current_user.role not in ['manager', 'admin']:
-        flash('Accès non autorisé', 'danger')
-        return redirect(url_for('main.index'))
-
-    voiture = mongo.db.voitures.find_one({'_id': ObjectId(voiture_id)})
     form = VoitureForm()
     
+    # Pour le sélecteur d'image principale
+    if request.method == 'GET':
+        form.image_principale.choices = [(img, f"Image {i+1}") for i, img in enumerate(voiture.get('images', []))]
+
     if form.validate_on_submit():
-        mongo.db.voitures.update_one(
-            {'_id': ObjectId(voiture_id)},
-            {'$set': {
+        try:
+            # Traitement des nouvelles images
+            if form.images.data:
+                for image in form.images.data:
+                    if image:
+                        filename = secure_filename(image.filename)
+                        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                        filename = f"{timestamp}_{filename}"
+                        
+                        image_path = os.path.join('app', 'static', 'images', filename)
+                        image.save(image_path)
+                        
+                        image_url = f'images/{filename}'
+                        Voiture.add_image(voiture_id, image_url)
+
+            # Mise à jour de l'image principale si sélectionnée
+            if form.image_principale.data:
+                mongo.db.voitures.update_one(
+                    {'_id': ObjectId(voiture_id)},
+                    {'$set': {'image_principale': form.image_principale.data}}
+                )
+
+            # Traitement des options
+            options = [opt.strip() for opt in form.options.data.split('\n') if opt.strip()] if form.options.data else []
+
+            # Mise à jour des autres champs
+            update_data = {
                 'marque': form.marque.data,
                 'modele': form.modele.data,
                 'annee': form.annee.data,
-                'prix': form.prix.data
-            }}
-        )
-        flash('Voiture modifiée avec succès!', 'success')
-        return redirect(url_for('main.gestion_voitures'))
-    
+                'prix': float(form.prix.data),  # Conversion de Decimal en float
+                'description': form.description.data,
+                'options': options,
+                'disponible': form.disponible.data,
+                'updated_at': datetime.utcnow()
+            }
+
+            mongo.db.voitures.update_one(
+                {'_id': ObjectId(voiture_id)},
+                {'$set': update_data}
+            )
+
+            flash('Voiture mise à jour avec succès!', 'success')
+            return redirect(url_for('main.gestion_voitures'))
+
+        except Exception as e:
+            flash(f'Erreur lors de la modification: {str(e)}', 'danger')
+
     elif request.method == 'GET':
-        form.marque.data = voiture['marque']
-        form.modele.data = voiture['modele']
-        form.annee.data = voiture['annee']
-        form.prix.data = voiture['prix']
-    
-    return render_template('modifier_voiture.html', form=form, voiture=voiture)
+        # Pré-remplir le formulaire
+        form.marque.data = voiture.get('marque')
+        form.modele.data = voiture.get('modele')
+        form.annee.data = voiture.get('annee')
+        form.prix.data = voiture.get('prix')
+        form.description.data = voiture.get('description')
+        form.disponible.data = voiture.get('disponible', True)
+        form.options.data = '\n'.join(voiture.get('options', []))
+
+    return render_template('voiture/modifier_voiture.html', form=form, voiture=voiture)
+
+@main_bp.route('/voiture/supprimer_image/<voiture_id>/<path:image_url>')
+@login_required
+def supprimer_image(voiture_id, image_url):
+    if current_user.role not in ['admin', 'manager']:
+        flash('Accès non autorisé', 'danger')
+        return redirect(url_for('main.index'))
+
+    try:
+        # Supprimer le fichier physique
+        image_path = os.path.join('app', 'static', image_url)
+        if os.path.exists(image_path):
+            os.remove(image_path)
+
+        # Supprimer la référence dans la base de données
+        Voiture.remove_image(voiture_id, image_url)
+        
+        flash('Image supprimée avec succès', 'success')
+    except Exception as e:
+        flash(f'Erreur lors de la suppression de l\'image: {str(e)}', 'danger')
+
+    return redirect(url_for('main.modifier_voiture', voiture_id=voiture_id))
 
 @main_bp.route('/supprimer_voiture/<voiture_id>')
 @login_required
@@ -214,22 +406,8 @@ def supprimer_voiture(voiture_id):
     flash('Voiture supprimée avec succès', 'success')
     return redirect(url_for('main.gestion_voitures'))
 
-@main_bp.route('/mes_reservations')
-@login_required
-def mes_reservations():
-    """Liste des réservations de l'utilisateur connecté"""
-    reservations = list(mongo.db.reservations.find({'client_id': current_user.id}))
-    
-    # Ajoutez cette ligne pour debug si nécessaire
-    print(f"Nombre de réservations trouvées: {len(reservations)}")
-    
-    return render_template('mes_reservations.html', reservations=reservations)
-    """Liste des réservations de l'utilisateur connecté"""
-    reservations = list(mongo.db.reservations.find({'client_id': current_user.id}))
-    return render_template('mes_reservations.html', reservations=reservations)
-
 # Section Manager
-@main_bp.route('/gestion/voitures')
+@main_bp.route('/gestion/voitures', methods=['GET', 'POST'])
 @login_required
 def gestion_voitures():
     """Gestion des voitures (accès réservé aux managers)"""
@@ -238,52 +416,86 @@ def gestion_voitures():
         return redirect(url_for('main.index'))
     
     voitures = list(mongo.db.voitures.find())
-    return render_template('gestion_voitures.html', voitures=voitures)
+    return render_template('voiture/gestion_voitures.html', voitures=voitures)
 
-@main_bp.route('/gestion/reservations')
+@main_bp.route('/gestion/reservations', methods=['GET', 'POST'])
 @login_required
 def gestion_reservations():
     if current_user.role not in ['manager', 'admin']:
         flash('Accès non autorisé', 'danger')
         return redirect(url_for('main.index'))
 
-    reservations = list(mongo.db.reservations.find())
-    
-    # Conversion des ObjectId en strings pour les clés
-    clients = {str(client['_id']): client for client in mongo.db.users.find({'role': 'client'})}
-    voitures = {str(voiture['_id']): voiture for voiture in mongo.db.voitures.find()}
+    # Gestion du formulaire
+    form = ReservationForm()
+    voitures = list(mongo.db.voitures.find({'disponible': True}))
+    form.voiture_id.choices = [(str(v['_id']), f"{v['marque']} {v['modele']} - {v['prix']}€/jour") for v in voitures]
 
-    return render_template('gestion_reservations.html',
-                         reservations=reservations,
-                         clients=clients,
-                         voitures=voitures)
-    if current_user.role not in ['manager', 'admin']:
-        flash('Accès non autorisé', 'danger')
-        return redirect(url_for('main.index'))
+    if form.validate_on_submit():
+        try:
+            # Validation des dates
+            date_debut = datetime.combine(form.date_debut.data, datetime.min.time())
+            date_fin = datetime.combine(form.date_fin.data, datetime.min.time())
+            
+            # Vérification que la date de début est future
+            if date_debut < datetime.now():
+                flash('La date de début doit être future', 'danger')
+                return redirect(url_for('main.gestion_reservations'))
+            
+            # Vérification que la date de fin est après la date de début
+            if date_fin <= date_debut:
+                flash('La date de fin doit être après la date de début', 'danger')
+                return redirect(url_for('main.gestion_reservations'))
 
-    # Récupérer toutes les données nécessaires avant de rendre le template
-    reservations = list(mongo.db.reservations.find())
-    clients = {str(client['_id']): client for client in mongo.db.users.find({'role': 'client'})}
-    voitures = {str(voiture['_id']): voiture for voiture in mongo.db.voitures.find()}
+            # Calcul du prix total
+            delta = date_fin - date_debut
+            jours = delta.days
+            if jours < 1:
+                flash('La durée de réservation doit être d\'au moins 1 jour', 'danger')
+                return redirect(url_for('main.gestion_reservations'))
 
-    return render_template('gestion_reservations.html',
-                         reservations=reservations,
-                         clients=clients,
-                         voitures=voitures)
-    if current_user.role not in ['manager', 'admin']:
-        flash('Accès non autorisé', 'danger')
-        return redirect(url_for('main.index'))
+            # Vérifier que la voiture existe et est toujours disponible
+            voiture = mongo.db.voitures.find_one({
+                '_id': ObjectId(form.voiture_id.data),
+                'disponible': True
+            })
+            
+            if not voiture:
+                flash('Cette voiture n\'est plus disponible', 'danger')
+                return redirect(url_for('main.gestion_reservations'))
 
-    # Récupération des réservations avec les informations des clients et voitures
-    reservations = list(mongo.db.reservations.aggregate([
-        {
-            '$lookup': {
-                'from': 'users',
-                'localField': 'client_id',
-                'foreignField': '_id',
-                'as': 'client'
+            total = jours * voiture['prix']
+            
+            # Créer la réservation
+            reservation_data = {
+                'client_nom': form.client_nom.data,
+                'voiture_id': ObjectId(form.voiture_id.data),
+                'date_debut': date_debut,  # Now using datetime object instead of date
+                'date_fin': date_fin,      # Now using datetime object instead of date
+                'prix_total': total,
+                'status': 'en_attente',
+                'created_at': datetime.utcnow()
             }
-        },
+            
+            # Insérer la réservation
+            result = mongo.db.reservations.insert_one(reservation_data)
+            
+            if result.inserted_id:
+                # Mettre à jour la disponibilité de la voiture
+                mongo.db.voitures.update_one(
+                    {'_id': ObjectId(form.voiture_id.data)},
+                    {'$set': {'disponible': False}}
+                )
+                flash('Réservation créée avec succès!', 'success')
+            else:
+                flash('Erreur lors de la création de la réservation', 'danger')
+            
+            return redirect(url_for('main.gestion_reservations'))
+            
+        except Exception as e:
+            flash(f"Erreur lors de la création: {str(e)}", 'danger')
+
+    # Récupération des réservations avec jointures
+    reservations = list(mongo.db.reservations.aggregate([
         {
             '$lookup': {
                 'from': 'voitures',
@@ -292,75 +504,14 @@ def gestion_reservations():
                 'as': 'voiture'
             }
         },
-        {
-            '$unwind': '$client'
-        },
-        {
-            '$unwind': {
-                'path': '$voiture',
-                'preserveNullAndEmptyArrays': True
-            }
-        },
-        {
-            '$sort': {'date_debut': -1}
-        }
+        {'$unwind': '$voiture'},
+        {'$sort': {'date_debut': -1}}
     ]))
 
-    return render_template('gestion_reservations.html', 
-                         reservations=reservations)
-    """Gestion complète des réservations"""
-    if current_user.role != 'manager' and current_user.role != 'admin':
-        flash('Accès non autorisé', 'danger')
-        return redirect(url_for('main.index'))
-
-    # Gestion du formulaire pour les requêtes POST
-    if request.method == 'POST':
-        form = ReservationForm()
-        if form.validate_on_submit():
-            # Vérifier la disponibilité
-            voiture = mongo.db.voitures.find_one({'_id': ObjectId(form.voiture_id.data)})
-            if not voiture or not voiture.get('disponible'):
-                flash('Voiture non disponible', 'danger')
-                return redirect(url_for('main.gestion_reservations'))
-
-            # Création de la réservation
-            reservation_data = {
-                'client_id': ObjectId(form.client_id.data),
-                'voiture_id': ObjectId(form.voiture_id.data),
-                'date_debut': form.date_debut.data,
-                'date_fin': form.date_fin.data,
-                'status': 'acceptee',
-                'created_by': current_user.id,
-                'created_at': datetime.utcnow()
-            }
-
-            with mongo.cx.start_session() as session:
-                with session.start_transaction():
-                    mongo.db.reservations.insert_one(reservation_data, session=session)
-                    mongo.db.voitures.update_one(
-                        {'_id': ObjectId(form.voiture_id.data)},
-                        {'$set': {'disponible': False}},
-                        session=session
-                    )
-
-            flash('Réservation créée!', 'success')
-            return redirect(url_for('main.gestion_reservations'))
-    else:
-        form = ReservationForm()
-
-    # Récupération des données pour l'affichage
-    clients = list(mongo.db.users.find({'role': 'client'}))
-    voitures_dispo = list(mongo.db.voitures.find({'disponible': True}))
-    
-    reservations = list(mongo.db.reservations.aggregate([
-        # Votre pipeline d'aggregation existant
-    ]))
-
-    return render_template('gestion_reservations.html',
+    return render_template('reservation/gestion_reservations.html',
                          form=form,
-                         clients=clients,
-                         voitures=voitures_dispo,
-                         reservations=reservations)
+                         reservations=reservations,
+                         voitures=voitures)
 
 @main_bp.route('/gestion/reservation/<reservation_id>/<status>')
 @login_required
@@ -370,104 +521,94 @@ def changer_statut_reservation(reservation_id, status):
         flash('Accès non autorisé', 'danger')
         return redirect(url_for('main.index'))
     
-    with mongo.cx.start_session() as session:
-        with session.start_transaction():
-            # Mettre à jour le statut de la réservation
-            mongo.db.reservations.update_one(
-                {'_id': ObjectId(reservation_id)},
-                {'$set': {'status': status}},
-                session=session
-            )
-            
-            # Si acceptée, marquer la voiture comme indisponible
+    try:
+        # Récupérer la réservation actuelle
+        reservation = mongo.db.reservations.find_one({'_id': ObjectId(reservation_id)})
+        
+        if not reservation:
+            flash('Réservation non trouvée', 'danger')
+            return redirect(url_for('main.gestion_reservations'))
+
+        # Mettre à jour le statut de la réservation
+        update_result = mongo.db.reservations.update_one(
+            {'_id': ObjectId(reservation_id)},
+            {'$set': {
+                'status': status,
+                'updated_at': datetime.utcnow(),
+                'updated_by': current_user.id
+            }}
+        )
+        
+        if update_result.modified_count > 0:
+            # Gérer la disponibilité de la voiture selon le nouveau statut
             if status == 'acceptee':
-                reservation = mongo.db.reservations.find_one(
-                    {'_id': ObjectId(reservation_id)},
-                    session=session
-                )
                 mongo.db.voitures.update_one(
                     {'_id': reservation['voiture_id']},
-                    {'$set': {'disponible': False}},
-                    session=session
+                    {'$set': {'disponible': False}}
                 )
-            # Si refusée et précédemment acceptée, rendre la voiture disponible
-            elif status == 'refusee':
-                reservation = mongo.db.reservations.find_one(
-                    {'_id': ObjectId(reservation_id)},
-                    session=session
+            elif status == 'refusee' or status == 'annulee':
+                mongo.db.voitures.update_one(
+                    {'_id': reservation['voiture_id']},
+                    {'$set': {'disponible': True}}
                 )
-                if reservation.get('status') == 'acceptee':
-                    mongo.db.voitures.update_one(
-                        {'_id': reservation['voiture_id']},
-                        {'$set': {'disponible': True}},
-                        session=session
-                    )
+            
+            flash(f'Statut de la réservation mis à jour: {status}', 'success')
+        else:
+            flash('Aucune modification effectuée', 'warning')
+            
+    except Exception as e:
+        flash(f"Erreur lors de la mise à jour: {str(e)}", 'danger')
     
-    flash('Statut de réservation mis à jour', 'success')
     return redirect(url_for('main.gestion_reservations'))
+
 @main_bp.route('/annuler_reservation/<reservation_id>')
 @login_required
 def annuler_reservation(reservation_id):
-    """Annulation d'une réservation par le client"""
     try:
-        # Vérification que l'ID est valide
-        reservation_oid = ObjectId(reservation_id)
-    except:
-        flash('ID de réservation invalide', 'danger')
-        return redirect(url_for('main.mes_reservations'))
+        # Vérifier que la réservation existe et appartient à l'utilisateur
+        reservation = mongo.db.reservations.find_one({
+            '_id': ObjectId(reservation_id),
+            '$or': [
+                {'created_by': current_user.id},
+                {'client_nom': current_user.username}
+            ]
+        })
+        
+        if not reservation:
+            flash('Réservation non trouvée ou accès non autorisé', 'danger')
+            return redirect(url_for('main.gestion_reservations'))
 
-    # Recherche de la réservation avec vérification du propriétaire
-    reservation = mongo.db.reservations.find_one({
-        '_id': reservation_oid,
-        'client_id': current_user.id
-    })
-    
-    if not reservation:
-        flash('Réservation non trouvée ou vous n\'y avez pas accès', 'danger')
-        return redirect(url_for('main.mes_reservations'))
-    
-    if reservation.get('status') != 'en_attente':
-        flash('Seules les réservations en attente peuvent être annulées', 'warning')
-        return redirect(url_for('main.mes_reservations'))
-    
-    # Transaction pour garantir l'intégrité des données
-    with mongo.cx.start_session() as session:
-        with session.start_transaction():
-            # Suppression de la réservation
-            mongo.db.reservations.delete_one(
-                {'_id': reservation_oid},
-                session=session
+        if reservation['status'] not in ['en_attente', 'acceptee']:
+            flash('Cette réservation ne peut plus être annulée', 'warning')
+            return redirect(url_for('main.gestion_reservations'))
+
+        # Mettre à jour le statut de la réservation
+        update_result = mongo.db.reservations.update_one(
+            {'_id': ObjectId(reservation_id)},
+            {'$set': {
+                'status': 'annulee',
+                'updated_at': datetime.utcnow(),
+                'updated_by': current_user.id
+            }}
+        )
+        
+        if update_result.modified_count > 0:
+            # Rendre la voiture disponible
+            mongo.db.voitures.update_one(
+                {'_id': reservation['voiture_id']},
+                {'$set': {'disponible': True}}
             )
+            flash('Réservation annulée avec succès', 'success')
+        else:
+            flash('Aucune modification effectuée', 'warning')
             
-            # Si la réservation était acceptée, rendre la voiture disponible
-            if reservation.get('status') == 'acceptee':
-                mongo.db.voitures.update_one(
-                    {'_id': reservation['voiture_id']},
-                    {'$set': {'disponible': True}},
-                    session=session
-                )
+    except Exception as e:
+        flash(f'Erreur lors de l\'annulation: {str(e)}', 'danger')
     
-    flash('Réservation annulée avec succès', 'success')
-    return redirect(url_for('main.mes_reservations'))
-    """Annulation d'une réservation par le client"""
-    reservation = mongo.db.reservations.find_one({
-        '_id': ObjectId(reservation_id),
-        'client_id': current_user.id
-    })
-    
-    if not reservation:
-        flash('Réservation non trouvée', 'danger')
-        return redirect(url_for('main.mes_reservations'))
-    
-    if reservation.status != 'en_attente':
-        flash('Seules les réservations en attente peuvent être annulées', 'warning')
-        return redirect(url_for('main.mes_reservations'))
-    
-    mongo.db.reservations.delete_one({'_id': ObjectId(reservation_id)})
-    flash('Réservation annulée avec succès', 'success')
-    return redirect(url_for('main.mes_reservations'))
+    return redirect(url_for('main.gestion_reservations'))
+
 # Section Administrateur
-@main_bp.route('/admin/managers')
+@main_bp.route('/admin/gestion_managers')
 @login_required
 def gestion_managers():
     """Gestion des comptes managers (accès réservé aux administrateurs)"""
@@ -476,7 +617,7 @@ def gestion_managers():
         return redirect(url_for('main.index'))
     
     managers = list(mongo.db.users.find({'role': 'manager'}))
-    return render_template('gestion_managers.html', managers=managers)
+    return render_template('admin/gestion_managers.html', managers=managers)
 @main_bp.route('/admin/ajouter_manager', methods=['GET', 'POST'])
 @login_required
 def ajouter_manager():
@@ -487,7 +628,8 @@ def ajouter_manager():
     form = ManagerForm()
     if form.validate_on_submit():
         # Vérifier si l'email existe déjà
-        if mongo.db.users.find_one({'email': form.email.data}):
+        existing_user = mongo.db.users.find_one({'email': form.email.data})
+        if existing_user:
             flash('Cet email est déjà utilisé', 'danger')
             return redirect(url_for('main.ajouter_manager'))
 
@@ -498,34 +640,17 @@ def ajouter_manager():
             'password': hashed_password,
             'role': 'manager',
             'created_at': datetime.utcnow(),
-            'created_by': current_user.id
+            'created_by': ObjectId(current_user.id)  # Convertir en ObjectId
         }
-        mongo.db.users.insert_one(manager_data)
-        flash('Manager ajouté avec succès!', 'success')
-        return redirect(url_for('main.gestion_managers'))
+        
+        try:
+            mongo.db.users.insert_one(manager_data)
+            flash('Manager ajouté avec succès!', 'success')
+            return redirect(url_for('main.gestion_managers'))
+        except Exception as e:
+            flash(f"Erreur lors de l'ajout: {str(e)}", 'danger')
 
-    return render_template('ajouter_manager.html', form=form)
-    if current_user.role != 'admin':
-        flash('Accès non autorisé', 'danger')
-        return redirect(url_for('main.index'))
-
-    form = ManagerForm()
-    if form.validate_on_submit():
-        hashed_password = generate_password_hash(form.password.data)
-        manager_data = {
-            'username': form.username.data,
-            'email': form.email.data,
-            'password': hashed_password,
-            'role': 'manager',
-            'created_at': datetime.utcnow(),
-            'created_by': current_user.id
-        }
-        mongo.db.users.insert_one(manager_data)
-        flash('Manager ajouté avec succès!', 'success')
-        return redirect(url_for('main.gestion_managers'))
-
-    return render_template('ajouter_manager.html', form=form)
-
+    return render_template('admin/ajouter_manager.html', form=form)
 @main_bp.route('/admin/modifier_manager/<manager_id>', methods=['GET', 'POST'])
 @login_required
 def modifier_manager(manager_id):
@@ -540,26 +665,51 @@ def modifier_manager(manager_id):
 
     form = ManagerForm()
     if form.validate_on_submit():
+        # Vérifier si l'email existe déjà pour un autre utilisateur
+        existing_user = mongo.db.users.find_one({
+            '_id': {'$ne': ObjectId(manager_id)},
+            'email': form.email.data
+        })
+        if existing_user:
+            flash('Cet email est déjà utilisé par un autre utilisateur', 'danger')
+            return redirect(url_for('main.modifier_manager', manager_id=manager_id))
+
+        # Préparer les données de mise à jour
         update_data = {
             'username': form.username.data,
             'email': form.email.data,
-            'updated_at': datetime.utcnow()
+            'updated_at': datetime.utcnow(),
+            'updated_by': current_user.id
         }
+        
+        # Ajouter le mot de passe uniquement s'il est fourni
         if form.password.data:
             update_data['password'] = generate_password_hash(form.password.data)
 
-        mongo.db.users.update_one(
-            {'_id': ObjectId(manager_id)},
-            {'$set': update_data}
-        )
-        flash('Manager mis à jour avec succès!', 'success')
-        return redirect(url_for('main.gestion_managers'))
+        try:
+            # Mettre à jour le manager
+            result = mongo.db.users.update_one(
+                {'_id': ObjectId(manager_id)},
+                {'$set': update_data}
+            )
+            
+            if result.modified_count > 0:
+                flash('Manager mis à jour avec succès!', 'success')
+            else:
+                flash('Aucune modification effectuée', 'info')
+            
+            return redirect(url_for('main.gestion_managers'))
+            
+        except Exception as e:
+            flash(f"Erreur lors de la mise à jour : {str(e)}", 'danger')
+            return redirect(url_for('main.modifier_manager', manager_id=manager_id))
 
     elif request.method == 'GET':
+        # Pré-remplir le formulaire avec les données existantes
         form.username.data = manager.get('username')
         form.email.data = manager.get('email')
 
-    return render_template('modifier_manager.html', form=form, manager=manager)
+    return render_template('admin/modifier_manager.html', form=form, manager=manager)
 
 @main_bp.route('/admin/supprimer_manager/<manager_id>')
 @login_required
@@ -627,7 +777,10 @@ def supprimer_manager(manager_id):
                          voitures=voitures_dispo)
 from datetime import datetime, date  # Ajoutez cet import en haut du fichier
 
-@main_bp.route('/nouvelle_reservation', methods=['GET', 'POST'])
+
+
+
+@main_bp.route('/reservation/nouvelle_reservation', methods=['GET', 'POST'])
 @login_required
 def nouvelle_reservation():
     if current_user.role not in ['manager', 'admin']:
@@ -674,14 +827,14 @@ def nouvelle_reservation():
             )
 
             flash('Réservation créée avec succès !', 'success')
-            return redirect(url_for('main.gestion_reservations'))
+            return redirect(url_for('reservation/gestion_reservations'))
 
         except Exception as e:
             flash(f"Erreur lors de la création : {str(e)}", 'danger')
             # Optionnel : logger l'erreur
             print(f"ERREUR: {e}")
 
-    return render_template('nouvelle_reservation.html', form=form)
+    return render_template('reservation/nouvelle_reservation.html', form=form)
     if current_user.role not in ['manager', 'admin']:
         flash('Accès non autorisé', 'danger')
         return redirect(url_for('main.index'))
@@ -730,3 +883,61 @@ def nouvelle_reservation():
                          form=form,
                          clients=clients,
                          voitures=voitures)
+
+@main_bp.route('/voiture/<voiture_id>')
+def details_voiture(voiture_id):
+    """Affiche les détails d'une voiture spécifique"""
+    try:
+        # Récupérer les informations de la voiture
+        voiture = mongo.db.voitures.find_one({'_id': ObjectId(voiture_id)})
+        if not voiture:
+            flash('Voiture non trouvée', 'danger')
+            return redirect(url_for('main.voitures'))
+        
+        # Récupérer les réservations en cours pour cette voiture
+        reservations = list(mongo.db.reservations.find({
+            'voiture_id': ObjectId(voiture_id),
+            'status': {'$in': ['en_attente', 'acceptee']},
+            'date_fin': {'$gte': datetime.now()}
+        }).sort('date_debut', 1))
+        
+        return render_template('voiture/details_voiture.html', 
+                            voiture=voiture,
+                            reservations=reservations)
+    except Exception as e:
+        flash(f"Erreur lors de la récupération des détails: {str(e)}", 'danger')
+        return redirect(url_for('main.voitures'))
+
+@main_bp.route('/gestion/supprimer_reservation/<reservation_id>')
+@login_required
+def supprimer_reservation(reservation_id):
+    """Suppression d'une réservation"""
+    if current_user.role not in ['manager', 'admin']:
+        flash('Accès non autorisé', 'danger')
+        return redirect(url_for('main.index'))
+
+    try:
+        # Récupérer la réservation
+        reservation = mongo.db.reservations.find_one({'_id': ObjectId(reservation_id)})
+        if not reservation:
+            flash('Réservation non trouvée', 'danger')
+            return redirect(url_for('main.gestion_reservations'))
+
+        # Supprimer la réservation
+        result = mongo.db.reservations.delete_one({'_id': ObjectId(reservation_id)})
+        
+        if result.deleted_count > 0:
+            # Rendre la voiture disponible si la réservation était active
+            if reservation['status'] in ['en_attente', 'acceptee']:
+                mongo.db.voitures.update_one(
+                    {'_id': reservation['voiture_id']},
+                    {'$set': {'disponible': True}}
+                )
+            flash('Réservation supprimée avec succès', 'success')
+        else:
+            flash('Erreur lors de la suppression de la réservation', 'danger')
+
+    except Exception as e:
+        flash(f'Erreur : {str(e)}', 'danger')
+
+    return redirect(url_for('main.gestion_reservations'))

@@ -60,21 +60,7 @@ def init_collections():
                 "couleurs": ["Blanc", "Gris", "Noir"],
                 "puissance": "140 ch"
             },
-            {
-                "marque": "BMW",
-                "modele": "Série 3",
-                "annee": 2022,
-                "prix": 95,
-                "disponible": True,
-                "image_base64": download_and_resize_image(car_images["bmw"]),
-                "description": "Berline sportive avec intérieur haut de gamme",
-                "type": "Essence",
-                "places": 5,
-                "transmission": "Automatique",
-                "options": ["Toit ouvrant", "Sièges chauffants", "Système audio premium"],
-                "couleurs": ["Bleu", "Noir", "Argent"],
-                "puissance": "258 ch"
-            },
+            
             {
                 "marque": "Audi",
                 "modele": "A3 Sportback",

@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 
 {% block content %}
+<script>
+function handleImageError(img) {
+    const defaultImage = "{{ url_for('static', filename='images/default-car.jpg') }}";
+    if (img.src !== defaultImage) {
+        img.src = defaultImage;
+    }
+}
+</script>
+
 <div class="container mt-5">
     <h1 class="mb-4">Notre flotte de véhicules <span class="badge bg-primary">{{ voitures|length }} disponibles</span></h1>
     
@@ -19,8 +28,10 @@
                 </div>
                 <div class="col-md-3">
                     <label for="prix-filter" class="form-label">Prix max/jour</label>
-                    <input type="range" class="form-range" id="prix-filter" min="0" max="{{ prix_max }}" value="{{ prix_max }}">
-                    <span id="prixValue">{{ prix_max }}€</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" id="prix-filter" min="0" max="{{ prix_max }}" value="{{ prix_max }}">
+                        <span id="prixValue" class="badge bg-secondary">{{ prix_max }}€</span>
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <label for="type-filter" class="form-label">Type</label>
@@ -31,9 +42,17 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="button" id="reset-filters" class="btn btn-outline-secondary w-100">
-                        <i class="fas fa-undo"></i> Réinitialiser
+                <div class="col-md-3">
+                    <label for="disponibilite-filter" class="form-label">Disponibilité</label>
+                    <select class="form-select" id="disponibilite-filter">
+                        <option value="">Tous</option>
+                        <option value="true">Disponibles uniquement</option>
+                        <option value="false">Non disponibles</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="button" id="reset-filters" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo"></i> Réinitialiser les filtres
                     </button>
                 </div>
             </div>
@@ -46,37 +65,53 @@
         <div class="col voiture-card" 
              data-marque="{{ voiture.marque }}"
              data-prix="{{ voiture.prix }}"
-             data-type="{{ voiture.type }}"
+             data-type="{{ voiture.type|default('') }}"
              data-disponible="{{ voiture.disponible|lower }}">
-            <div class="card h-100 {% if not voiture.disponible %}opacity-50{% endif %}">
-                {% if voiture.image_base64 %}
-                <img src="data:image/jpeg;base64,{{ voiture.image_base64 }}" 
-                     class="card-img-top" 
-                     alt="{{ voiture.marque }} {{ voiture.modele }}"
-                     style="height: 200px; object-fit: cover;">
-                {% else %}
-                <img src="{{ url_for('static', filename='images/default-car.jpg') }}" 
-                     class="card-img-top" 
-                     alt="Image par défaut"
-                     style="height: 200px; object-fit: cover;">
-                {% endif %}
+            <div class="card h-100 {% if not voiture.disponible %}opacity-75{% endif %}">
+                <div class="card-img-wrapper" style="height: 200px; overflow: hidden;">
+                    {% if voiture.image_url %}
+                    <img src="{{ url_for('static', filename=voiture.image_url) if '/' in voiture.image_url else url_for('static', filename='images/' + voiture.image_url) }}"
+                         class="card-img-top"
+                         alt="{{ voiture.marque }} {{ voiture.modele }}"
+                         style="width: 100%; height: 100%; object-fit: cover;"
+                         onerror="handleImageError(this)">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='images/default-car.jpg') }}"
+                         class="card-img-top"
+                         alt="Image par défaut"
+                         style="width: 100%; height: 100%; object-fit: cover;">
+                    {% endif %}
+                </div>
+
                 <div class="card-body">
                     <h5 class="card-title">{{ voiture.marque }} {{ voiture.modele }}</h5>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="badge bg-info">{{ voiture.annee }}</span>
+                        {% if voiture.type %}
                         <span class="badge bg-secondary">{{ voiture.type }}</span>
+                        {% endif %}
+                        {% if voiture.transmission %}
                         <span class="badge bg-dark">{{ voiture.transmission }}</span>
+                        {% endif %}
                     </div>
-                    <p class="card-text">{{ voiture.description }}</p>
+                    {% if voiture.description %}
+                    <p class="card-text text-truncate">{{ voiture.description }}</p>
+                    {% endif %}
+                    {% if voiture.options %}
                     <div class="options-list mb-3">
                         <h6>Options :</h6>
                         <div class="d-flex flex-wrap gap-1">
-                            {% for option in voiture.options %}
+                            {% for option in voiture.options[:3] %}
                             <span class="badge bg-light text-dark">{{ option }}</span>
                             {% endfor %}
+                            {% if voiture.options|length > 3 %}
+                            <span class="badge bg-light text-dark">+{{ voiture.options|length - 3 }}</span>
+                            {% endif %}
                         </div>
                     </div>
+                    {% endif %}
                 </div>
+
                 <div class="card-footer bg-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -86,18 +121,24 @@
                             <div class="text-danger mt-1"><small>Indisponible</small></div>
                             {% endif %}
                         </div>
-                        {% if current_user.is_authenticated %}
-                            <a href="{{ url_for('main.reserver', voiture_id=voiture._id) }}" 
-                               class="btn btn-primary {% if not voiture.disponible %}disabled{% endif %}">
-                                <i class="fas fa-calendar-check"></i> Réserver
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('main.details_voiture', voiture_id=voiture._id) }}" 
+                               class="btn btn-outline-primary">
+                                <i class="fas fa-info-circle"></i> Détails
                             </a>
-                        {% else %}
-                            <button class="btn btn-primary" 
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#loginModal">
-                                <i class="fas fa-lock"></i> Connectez-vous
-                            </button>
-                        {% endif %}
+                            {% if current_user.is_authenticated %}
+                                <a href="{{ url_for('main.reserver', voiture_id=voiture._id) }}" 
+                                   class="btn btn-primary {% if not voiture.disponible %}disabled{% endif %}">
+                                    <i class="fas fa-calendar-check"></i> Réserver
+                                </a>
+                            {% else %}
+                                <button class="btn btn-primary" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#loginModal">
+                                    <i class="fas fa-lock"></i> Connectez-vous
+                                </button>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -134,12 +175,13 @@
 <!-- Script pour le filtrage dynamique -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Sélecteurs des éléments de filtrage
     const marqueFilter = document.getElementById('marque-filter');
     const prixFilter = document.getElementById('prix-filter');
     const prixValue = document.getElementById('prixValue');
     const typeFilter = document.getElementById('type-filter');
+    const disponibiliteFilter = document.getElementById('disponibilite-filter');
     const resetBtn = document.getElementById('reset-filters');
-    const voituresContainer = document.getElementById('voitures-container');
     const voitureCards = document.querySelectorAll('.voiture-card');
     
     // Mise à jour de l'affichage du prix
@@ -149,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Filtrage lors du changement des sélecteurs
-    [marqueFilter, typeFilter].forEach(filter => {
+    [marqueFilter, typeFilter, disponibiliteFilter].forEach(filter => {
         filter.addEventListener('change', filterVoitures);
     });
     
@@ -157,50 +199,93 @@ document.addEventListener('DOMContentLoaded', function() {
     resetBtn.addEventListener('click', function() {
         marqueFilter.value = '';
         typeFilter.value = '';
+        disponibiliteFilter.value = '';
         prixFilter.value = prixFilter.max;
         prixValue.textContent = prixFilter.max + '€';
         filterVoitures();
+        
+        // Animation de rafraîchissement
+        voitureCards.forEach(card => {
+            card.style.opacity = '0';
+            setTimeout(() => {
+                card.style.display = 'block';
+                card.style.opacity = '1';
+            }, 300);
+        });
     });
     
     // Fonction de filtrage
     function filterVoitures() {
         const selectedMarque = marqueFilter.value.toLowerCase();
         const selectedType = typeFilter.value.toLowerCase();
+        const selectedDisponibilite = disponibiliteFilter.value;
         const maxPrix = parseInt(prixFilter.value);
+        
+        let visibleCount = 0;
         
         voitureCards.forEach(card => {
             const marque = card.dataset.marque.toLowerCase();
-            const type = card.dataset.type.toLowerCase();
+            const type = (card.dataset.type || '').toLowerCase();
             const prix = parseInt(card.dataset.prix);
             const disponible = card.dataset.disponible === 'true';
             
-            const marqueMatch = !selectedMarque || marque.includes(selectedMarque);
-            const typeMatch = !selectedType || type.includes(selectedType);
+            const marqueMatch = !selectedMarque || marque === selectedMarque;
+            const typeMatch = !selectedType || type === selectedType;
             const prixMatch = prix <= maxPrix;
+            const disponibiliteMatch = !selectedDisponibilite || disponible.toString() === selectedDisponibilite;
             
-            if (marqueMatch && typeMatch && prixMatch) {
+            if (marqueMatch && typeMatch && prixMatch && disponibiliteMatch) {
                 card.style.display = 'block';
+                visibleCount++;
             } else {
                 card.style.display = 'none';
             }
         });
+        
+        // Mettre à jour le compteur
+        const badge = document.querySelector('h1 .badge');
+        if (badge) {
+            badge.textContent = `${visibleCount} ${visibleCount > 1 ? 'disponibles' : 'disponible'}`;
+        }
     }
 });
 </script>
 
 <style>
-    .opacity-50 {
-        opacity: 0.5;
-    }
-    .options-list {
-        max-height: 100px;
-        overflow-y: auto;
-    }
-    .voiture-card {
-        transition: transform 0.3s ease;
-    }
-    .voiture-card:hover {
-        transform: translateY(-5px);
-    }
+.card-img-wrapper {
+    position: relative;
+    background-color: #f8f9fa;
+}
+
+.card-img-wrapper img {
+    transition: transform 0.3s ease;
+}
+
+.card:hover .card-img-wrapper img {
+    transform: scale(1.05);
+}
+
+.voiture-card {
+    transition: all 0.3s ease;
+}
+
+.voiture-card:hover {
+    transform: translateY(-5px);
+}
+
+.options-list {
+    max-height: 80px;
+    overflow-y: hidden;
+}
+
+.form-range::-webkit-slider-thumb {
+    background: #0d6efd;
+}
+.form-range::-moz-range-thumb {
+    background: #0d6efd;
+}
+.form-range::-ms-thumb {
+    background: #0d6efd;
+}
 </style>
 {% endblock %}

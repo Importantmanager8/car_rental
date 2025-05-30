@@ -11,7 +11,18 @@
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('main.reserver', voiture_id=voiture._id) }}">
                         {{ form.hidden_tag() }}
+                        <div class="form-group">
+                            {{ form.client_nom.label }}
+                            {{ form.client_nom(class="form-control") }}
+                            {% for error in form.client_nom.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
                         
+                        <div class="form-group">
+                            {{ form.voiture_id.label }}
+                            {{ form.voiture_id(class="form-control", disabled=True) }}
+                        </div>
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <div class="form-group">

@@ -1,24 +1,39 @@
-/projet_location_voitures
-│
-├── /app
+projet_location_voitures/
+├── app/
 │   ├── __init__.py
-│   ├── routes.py
-│   ├── models.py
 │   ├── forms.py
-│   ├── /templates
+│   ├── models.py
+│   ├── routes.py
+│   ├── schemas.py
+│   ├── templates/
+│   │   ├── admin/
+│   │   │   ├── ajouter_manager.html
+│   │   │   ├── gestion_managers.html
+│   │   │   └── modifier_manager.html
 │   │   ├── base.html
+│   │   ├── css/
+│   │   │   └── style.css
 │   │   ├── index.html
 │   │   ├── login.html
 │   │   ├── register.html
-│   │   ├── voitures.html
-│   │   ├── reservations.html
-│   │   ├── gestion_voitures.html
-│   │   ├── gestion_clients.html
-│   │   └── gestion_managers.html
-│   └── /static
-│       ├── css/style.css
-│       └── js/script.js
-│
+│   │   ├── reservation/
+│   │   │   ├── gestion_reservations.html
+│   │   │   ├── mes_reservations.html
+│   │   │   ├── nouvelle_reservation.html
+│   │   │   └── reserver.html
+│   │   └── voiture/
+│   │       ├── ajouter_voiture.html
+│   │       ├── details_voiture.html
+│   │       ├── gestion_voitures.html
+│   │       ├── modifier_voiture.html
+│   │       └── voitures.html
+│   ├── utils.py
+│   └── static/
+│       └── css/
+│           ├── main.css
+│           └── style.css
 ├── config.py
-├── requirements.txt
-└── run.py
+├── create_admin.py
+├── init_db.py
+├── run.py
+└── bd.txt (fichier contenant tout le code du projet)

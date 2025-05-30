@@ -1,40 +1,118 @@
-.invalid-feedback.d-block {
-    display: block !important;
-    color: #dc3545;
-    font-size: 0.875em;
+/* ===== Nouveau style moderne pour les voitures ===== */
+body {
+    font-family: 'Inter', sans-serif;
+    background: #f4f6f9;
+    color: #333;
 }
 
-.card {
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+#voitures-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem;
 }
 
-.card-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
-}
-.table-responsive {
-    margin-top: 20px;
-}
-
-.badge {
-    font-size: 0.9em;
-    padding: 0.35em 0.65em;
+.voiture-card .card {
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    display: flex;
+    flex-direction: column;
 }
 
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
-.table-responsive {
-    margin-top: 20px;
+.voiture-card .card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
-.badge {
-    font-size: 0.9em;
-    padding: 0.35em 0.65em;
+.card-img-top {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    border-bottom: 1px solid #eee;
 }
 
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
+.card-body {
+    padding: 1rem 1.25rem;
+    flex: 1;
+}
+
+.card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.card-body .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.8rem;
+}
+
+.card-body .badges .badge {
+    font-size: 0.7rem;
+    padding: 0.3em 0.6em;
+    background-color: #f0f0f0;
+    color: #555;
+    border-radius: 6px;
+}
+
+.card-text {
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.options-list h6 {
+    font-size: 0.9rem;
+    margin-bottom: 0.3rem;
+    font-weight: 500;
+}
+
+.options-list .badge {
+    background-color: #eaf0f9;
+    color: #0056b3;
+    font-size: 0.7rem;
+    border-radius: 6px;
+}
+
+.card-footer {
+    background-color: #fff;
+    border-top: 1px solid #eee;
+    padding: 1rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-footer .price {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #4a69bd;
+}
+
+.card-footer small {
+    font-size: 0.75rem;
+    color: #999;
+}
+
+.btn-reserve {
+    background-color: #4a69bd;
+    color: #fff;
+    border: none;
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    transition: background-color 0.2s ease;
+}
+
+.btn-reserve:hover {
+    background-color: #39549d;
+}
+
+.opacity-50 {
+    opacity: 0.5;
+    pointer-events: none;
 }

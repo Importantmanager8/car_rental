@@ -6,10 +6,10 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="text-center">Ajouter un Manager</h3>
+                    <h3 class="text-center">Modifier un Manager</h3>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('main.ajouter_manager') }}">
+                    <form method="POST" action="{{ url_for('main.modifier_manager', manager_id=manager._id) }}">
                         {{ form.hidden_tag() }}
                         
                         <div class="form-group mb-3">
@@ -38,7 +38,8 @@
                         
                         <div class="form-group mb-3">
                             {{ form.password.label(class="form-label") }}
-                            {{ form.password(class="form-control", placeholder="Mot de passe") }}
+                            {{ form.password(class="form-control", placeholder="Laisser vide pour ne pas modifier") }}
+                            <small class="form-text text-muted">Laissez vide si vous ne souhaitez pas modifier le mot de passe</small>
                             {% if form.password.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in form.password.errors %}
@@ -50,7 +51,7 @@
                         
                         <div class="form-group mb-3">
                             {{ form.confirm_password.label(class="form-label") }}
-                            {{ form.confirm_password(class="form-control", placeholder="Confirmer le mot de passe") }}
+                            {{ form.confirm_password(class="form-control", placeholder="Confirmer le nouveau mot de passe") }}
                             {% if form.confirm_password.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in form.confirm_password.errors %}
@@ -61,7 +62,7 @@
                         </div>
                         
                         <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                            <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
                             <a href="{{ url_for('main.gestion_managers') }}" class="btn btn-secondary">Annuler</a>
                         </div>
                     </form>

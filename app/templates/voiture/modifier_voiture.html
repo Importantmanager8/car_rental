@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Modifier une voiture</h2>
+    <form method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.marque.label }}
+                    {{ form.marque(class="form-control") }}
+                </div>
+                <div class="form-group">
+                    {{ form.modele.label }}
+                    {{ form.modele(class="form-control") }}
+                </div>
+                <div class="form-group">
+                    {{ form.annee.label }}
+                    {{ form.annee(class="form-control") }}
+                </div>
+                <div class="form-group">
+                    {{ form.prix.label }}
+                    {{ form.prix(class="form-control") }}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.description.label }}
+                    {{ form.description(class="form-control", rows=4) }}
+                </div>
+                <div class="form-group">
+                    {{ form.options.label }}
+                    {{ form.options(class="form-control", rows=4) }}
+                    <small class="form-text text-muted">Entrez une option par ligne</small>
+                </div>
+                <div class="form-group">
+                    {{ form.disponible.label }}
+                    {{ form.disponible(class="form-check-input ml-2") }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section des images -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <h4>Images actuelles</h4>
+                <div class="row">
+                    {% for image in voiture.images %}
+                    <div class="col-md-3 mb-3">
+                        <div class="card">
+                            <img src="{{ url_for('static', filename=image) }}" class="card-img-top" alt="Image voiture" style="height: 200px; object-fit: cover;">
+                            <div class="card-body">
+                                <div class="form-check mb-2">
+                                    <input type="radio" name="image_principale" value="{{ image }}" class="form-check-input" 
+                                           {% if image == voiture.image_principale %}checked{% endif %}>
+                                    <label class="form-check-label">Image principale</label>
+                                </div>
+                                <a href="{{ url_for('main.supprimer_image', voiture_id=voiture._id, image_url=image) }}" 
+                                   class="btn btn-danger btn-sm"
+                                   onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette image ?')">
+                                    Supprimer
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="form-group">
+                    {{ form.images.label }}
+                    {{ form.images(class="form-control-file") }}
+                    <small class="form-text text-muted">Vous pouvez sélectionner plusieurs images à la fois</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+                <a href="{{ url_for('main.gestion_voitures') }}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

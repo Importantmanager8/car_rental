@@ -1,0 +1,60 @@
+import os
+from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+
+load_dotenv()
+# Config pour les uploads
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Configuration des uploads
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'app', 'static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5MB
+
+# Créer le dossier uploads s'il n'existe pas
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+# Créez le dossier uploads s'il n'existe pas
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+class Config:
+    SECRET_KEY = os.getenv('SECRET_KEY') or '035c5c957ce353c1e815b955d832edf85c4e933663e4d22a8224910b321147f4'
+    MONGO_URI = os.getenv('MONGO_URI') or 'mongodb://localhost:27017/location_voitures'
+    DEBUG = True
+    ---------------------------------------------------------------------------------------------------------------
+    import os
+from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+
+# Charger les variables d'environnement
+load_dotenv()
+
+# ⚙️ Chemin absolu (modifie-le si nécessaire)
+ABSOLUTE_UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER') or os.path.abspath("C:/Users/elkho/Downloads")
+
+# 💾 OU chemin relatif dans le projet (ex : static/uploads)
+PROJECT_UPLOAD_FOLDER = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    'app', 'static', 'uploads'
+)
+
+# ✅ Sélectionne celui que tu veux utiliser :
+UPLOAD_FOLDER = ABSOLUTE_UPLOAD_FOLDER  # ou PROJECT_UPLOAD_FOLDER
+
+# 🔒 Taille maximale : 5 Mo
+MAX_CONTENT_LENGTH = 5 * 1024 * 1024
+
+# 📂 Extensions autorisées
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# 📂 Création du dossier si nécessaire
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# 🎛️ Classe de config Flask
+class Config:
+    SECRET_KEY = os.getenv('SECRET_KEY') or '035c5c957ce353c1e815b955d832edf85c4e933663e4d22a8224910b321147f4'
+    MONGO_URI = os.getenv('MONGO_URI') or 'mongodb://localhost:27017/location_voitures'
+    DEBUG = True
+    UPLOAD_FOLDER = UPLOAD_FOLDER
+    MAX_CONTENT_LENGTH = MAX_CONTENT_LENGTH

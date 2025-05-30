@@ -5,7 +5,6 @@ to run this code follow these steps
 2- now we need to generate a secret key to maintain a secret connexion between the code and mongodb
     a-open a any terminal where u can run a python code 
     b- run this 
-        
         import secrets
         print(secrets.token_hex(32))  # Copiez la sortie dans .env
     c- go to a file called '.env', paste the output of the code in the variable called 'SECRET_KEY'

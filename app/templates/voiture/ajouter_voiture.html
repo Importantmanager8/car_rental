@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Ajouter une nouvelle voiture</h2>
+    <form method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.marque.label }}
+                    {{ form.marque(class="form-control") }}
+                </div>
+                <div class="form-group">
+                    {{ form.modele.label }}
+                    {{ form.modele(class="form-control") }}
+                </div>
+                <div class="form-group">
+                    {{ form.annee.label }}
+                    {{ form.annee(class="form-control") }}
+                </div>
+                <div class="form-group">
+                    {{ form.prix.label }}
+                    {{ form.prix(class="form-control") }}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    {{ form.description.label }}
+                    {{ form.description(class="form-control", rows=4) }}
+                </div>
+                <div class="form-group">
+                    {{ form.options.label }}
+                    {{ form.options(class="form-control", rows=4) }}
+                    <small class="form-text text-muted">Entrez une option par ligne</small>
+                </div>
+                <div class="form-group">
+                    {{ form.disponible.label }}
+                    {{ form.disponible(class="form-check-input ml-2") }}
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="form-group">
+                    {{ form.images.label }}
+                    {{ form.images(class="form-control-file") }}
+                    <small class="form-text text-muted">Vous pouvez sélectionner plusieurs images à la fois. La première image sélectionnée sera l'image principale.</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Ajouter la voiture</button>
+                <a href="{{ url_for('main.gestion_voitures') }}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
