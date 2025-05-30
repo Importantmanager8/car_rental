@@ -1,0 +1,94 @@
+[{
+  "_id": {
+    "$oid": "6803d893160e3d598ae7ddef"
+  },
+  "marque": "Toyota",
+  "modele": "Corolla",
+  "annee": 2022,
+  "prix": 50,
+  "disponible": false,
+  "image_url": "images/toyota-corolla.png",
+  "description": "Voiture compacte économique",
+  "updated_at": {
+    "$date": "2025-05-29T23:17:55.886Z"
+  },
+  "updated_by": "6817abb620cc9f9b23011a73",
+  "images": [
+    "images/20250530001612_C430752_8X8_.png",
+    "images/20250530001755_C430752_8X8_.png"
+  ],
+  "options": []
+},
+{
+  "_id": {
+    "$oid": "6803d893160e3d598ae7ddf0"
+  },
+  "marque": "BMW",
+  "modele": "Série 3",
+  "annee": 2021,
+  "prix": 80,
+  "disponible": false,
+  "image_url": "images/bmw-serie3.png",
+  "description": "Berline sportive haut de gamme",
+  "options: ": "Apple CarPlay",
+  "updated_at": {
+    "$date": "2025-05-29T18:34:34.371Z"
+  },
+  "updated_by": "6817abb620cc9f9b23011a73"
+},
+{
+  "_id": {
+    "$oid": "6817acbb301fa4eb87e8a68e"
+  },
+  "marque": "Honda",
+  "modele": "City",
+  "annee": 2004,
+  "prix": 15,
+  "disponible": false,
+  "image_url": "images/honda-city.jpg",
+  "description": "Voiture compacte économique"
+},
+{
+  "_id": {
+    "$oid": "683852b275afc28eed03249a"
+  },
+  "marque": "SUBARU",
+  "modele": "CROSSTREK",
+  "annee": 2024,
+  "prix": 15,
+  "options": [
+    "climatisation",
+    "gps",
+    "sieges_chauffants",
+    "camera_recul"
+  ],
+  "disponible": false,
+  "created_at": {
+    "$date": "2025-05-29T12:27:30.085Z"
+  },
+  "image_url": "images/f5e32wvo3mh1yd1ltl8mcmbri.jpg",
+  "description": "",
+  "updated_at": {
+    "$date": "2025-05-29T19:27:01.896Z"
+  },
+  "updated_by": "6838ab52bf6f140044511057"
+},
+{
+  "_id": {
+    "$oid": "6838b4d4cdf19e6ca1ae56fe"
+  },
+  "marque": "Rolce Royce",
+  "modele": "Phantom ",
+  "annee": 2025,
+  "prix": 1800,
+  "options": [
+    "climatisation",
+    "gps",
+    "sieges_chauffants"
+  ],
+  "disponible": false,
+  "image_url": "images/20250529202612_rolce_royce.png",
+  "created_at": {
+    "$date": "2025-05-29T19:26:12.779Z"
+  }
+}]

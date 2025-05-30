@@ -1,0 +1,82 @@
+[{
+  "_id": {
+    "$oid": "6803c873cd3d158d0b135f16"
+  },
+  "username": "admin",
+  "email": "admin@example.com",
+  "password": "scrypt:32768:8:1$G4THYPa1ub8LdpVO$ede595e22b3652fcd69361947f154f4c7b6d359cf0467bde2ce67d5cc2543c70f39dc8c322d9a4d7daf3120bd76e471499f63577deb575b4cc2ffd6dbd22f140",
+  "role": "admin"
+},
+{
+  "_id": {
+    "$oid": "6817abb620cc9f9b23011a73"
+  },
+  "username": "Mouad Bencaid",
+  "email": "mouad@gmail.com",
+  "password": "scrypt:32768:8:1$C34t9aB2G6VjZmBV$ed0ae2a5fbc5e56b969c67d2444c0bc0e4adb65cbd28de07bce9f39fe3b248a287c9f1f02b97be21cc3451d3af0bb69ea9402d39fa328bda34f791449deadbdc",
+  "role": "manager"
+},
+{
+  "_id": {
+    "$oid": "6817ceae5fe42a767be281cf"
+  },
+  "username": "mmm",
+  "email": "mmm@gmail.com",
+  "password": "scrypt:32768:8:1$OxWh7IZV54PrBQnK$6aa6732be23e25953a86550235bfb37b05c327a362d9d6267ebf557935da5538a0155a353a1e09672beeccce151703ab09cb395051ab77600100b91d3bc74682",
+  "role": "manager",
+  "created_at": {
+    "$date": "2025-05-04T20:31:42.368Z"
+  },
+  "created_by": {
+    "$oid": "6803c873cd3d158d0b135f16"
+  }
+},
+{
+  "_id": {
+    "$oid": "681942af7b33141361fe091b"
+  },
+  "username": "Marwane El Khoukh",
+  "email": "marwane@gmail.com",
+  "password": "scrypt:32768:8:1$iskC8DRzmrWYQ9ax$2acc94beb7dd1adb4bb24bcf0c9fc5b6f492db7bfbfe4ab9ac7fb7592534af009205a3b2fc50d5c6f9f02119ff862fc963bbb8d005049d01e709bfcea6082866",
+  "role": "manager",
+  "created_at": {
+    "$date": "2025-05-05T22:58:55.609Z"
+  },
+  "created_by": {
+    "$oid": "6803c873cd3d158d0b135f16"
+  },
+  "updated_at": {
+    "$date": "2025-05-29T22:55:44.977Z"
+  },
+  "updated_by": "6803c873cd3d158d0b135f16"
+},
+{
+  "_id": {
+    "$oid": "6838ab52bf6f140044511057"
+  },
+  "username": "Doha Chaari",
+  "email": "doha@gmail.com",
+  "password": "scrypt:32768:8:1$AjzcJUDZcKBhEGZA$b95a4d86707ab83c097a423b125aa013daddfe19c9b6c9ae73befd2d11e174ec8d42b8ebf65b145c766eae40c3fad45bc86be9c8f802f23666961a07bdb1c8c8",
+  "role": "manager",
+  "created_at": {
+    "$date": "2025-05-29T18:45:38.762Z"
+  },
+  "created_by": {
+    "$oid": "6803c873cd3d158d0b135f16"
+  }
+},
+{
+  "_id": {
+    "$oid": "68398bd443ce88e6ec57e41f"
+  },
+  "username": "test",
+  "email": "test@gmail.com",
+  "password": "scrypt:32768:8:1$fSawFXU23Clvm1dl$d2daff54ee14370570bb8d92eb68ddd2d95f5935c2e6fc49e880e9befeb077f3b4a1de4343dab25539bfa30fcca7e75d4f438676f58643067f21ab689c655029",
+  "role": "manager",
+  "created_at": {
+    "$date": "2025-05-30T10:43:32.911Z"
+  },
+  "created_by": {
+    "$oid": "6803c873cd3d158d0b135f16"
+  }
+}]
